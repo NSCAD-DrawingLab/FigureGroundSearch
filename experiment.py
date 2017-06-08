@@ -24,23 +24,16 @@ SQUARE = "square"
 LOCAL  = "local"
 GLOBAL = "global"
 
-OR_UP    = "ROTATED_0_DEG"
-OR_RIGHT = "ROTATED_90_DEG"
-OR_DOWN  = "ROTATED_180_DEG"
-OR_LEFT  = "ROTATED_270_DEG"
-
 CENTRAL    = "central"
 PERIPHERAL = "peripheral"
 
 BLACK = (0, 0, 0, 255)
 WHITE = (255, 255, 255, 255)
 NEUTRAL_COLOR = P.default_fill_color
-TRANSPARENT = (0, 0, 0, 0)
+TRANSPARENT = 0
+OPAQUE = 255
 RGBA = "RGBA"
 
-"""
-EXPERIMENT FACTORS & 'METAFACTORS' (ie. between-block variations as against between-trial)
-"""
 
 """
 This code defines a  class that 'extends' the basic KLExperiment class.
@@ -105,7 +98,7 @@ class FigureGroundSearch(klibs.Experiment):
         smaller_than_screen = True
         while smaller_than_screen:
             self.maximum_mask_size += 1
-            new_max_mask_px = deg_to_px(self.maximum_mask_size) + deg_to_px(self.stim_size) // 2 + self.stim_pad // 2
+            new_max_mask_px = deg_to_px(self.maximum_mask_size) + self.mask_blur_width * 4 + 2
             if new_max_mask_px > P.screen_y:
                 smaller_than_screen = False
                 self.maximum_mask_size -= 1
@@ -255,7 +248,7 @@ class FigureGroundSearch(klibs.Experiment):
     def texture(self, texture_figure, orientation=None):
         grid_size = (deg_to_px(self.stim_size) + self.stim_pad) * 2
         stim_offset = self.stim_pad // 2
-        dc = Image.new(RGBA, (grid_size, grid_size), TRANSPARENT)
+        dc = Image.new(RGBA, (grid_size, grid_size), (0,0,0,0))
         stroke_width = 2  #px
         grid_cell_size = deg_to_px(self.bg_element_size + self.bg_element_pad)
         grid_cell_count = grid_size // grid_cell_size
@@ -315,7 +308,7 @@ class FigureGroundSearch(klibs.Experiment):
         br_fig = 2 * stim_size_px
         rect_right = br_fig - stim_size_px
         dc_size = (stim_size_px + half_pad) * 2
-        dc = Image.new(RGBA,  (dc_size, dc_size), TRANSPARENT)
+        dc = Image.new(RGBA,  (dc_size, dc_size), (0,0,0,0))
 
         if figure_shape == CIRCLE:
             ImageDraw.Draw(dc, RGBA).ellipse((tl_fig, tl_fig, br_fig, br_fig), WHITE)
@@ -335,53 +328,39 @@ class FigureGroundSearch(klibs.Experiment):
 
     def mask(self, diameter, mask_type):
         MASK_COLOR = NEUTRAL_COLOR
-        diameter_deg = diameter
         diameter = deg_to_px(diameter)
-        stim_size = deg_to_px(self.stim_size)
-        pad =  self.stim_pad  # note, just borrowing this padding value, it's use is not related to the stimuli at all
+        blur_width = self.mask_blur_width
 
-        if mask_type == PERIPHERAL:
-            # Create maskable space hack:
-            #   Minimize the size of the peripheral mask by simply painting the screen a neutral color any time
-            #   the peripheral mask would only be revealing a neutral color.
-            r = diameter // 2 + stim_size // 2
-            scx =  P.screen_c[0]
-            scy =  P.screen_c[1]
-            self.el.add_boundary("{0}_{1}".format(mask_type, diameter_deg), [(scx - r, scy - r), (scx + r, scy + r)], RECT_BOUNDARY)
-
-
+        if mask_type != "none":
+            
+            if mask_type == PERIPHERAL:
+                bg_width  = P.screen_x * 2
+                bg_height = P.screen_y * 2
+                inner_fill = TRANSPARENT
+                outer_fill = OPAQUE
+                
+            elif mask_type == CENTRAL:
+                bg_width  = diameter + blur_width * 4 + 2
+                bg_height = bg_width
+                inner_fill = OPAQUE
+                outer_fill = TRANSPARENT
+                
             # Create solid background
-            bg_size = diameter + pad + 2 * stim_size
-            bg = Image.new(RGBA, (bg_size, bg_size), MASK_COLOR)
-
-
+            bg = Image.new('RGB', (bg_width, bg_height), MASK_COLOR[:3])
+    
             # Create an alpha mask
-            tl = pad // 2 + stim_size
-            br = bg_size - tl
-            alpha_mask = Image.new(RGBA, (bg_size, bg_size), TRANSPARENT)
-            ImageDraw.Draw(alpha_mask, RGBA).ellipse((tl, tl, br, br), WHITE, MASK_COLOR)
-            alpha_mask = alpha_mask.filter( ImageFilter.GaussianBlur(self.mask_blur_width) )
-            alpha_mask = aggdraw_to_numpy_surface(alpha_mask)
-
-            # render mask
+            r  = diameter // 2
+            x1 = (bg_width  // 2) - r
+            y1 = (bg_height // 2) - r
+            x2 = (bg_width  // 2) + r
+            y2 = (bg_height // 2) + r
+            alpha_mask = Image.new('L', (bg_width, bg_height), outer_fill)
+            ImageDraw.Draw(alpha_mask).ellipse((x1, y1, x2, y2), fill=inner_fill)
+            alpha_mask = alpha_mask.filter( ImageFilter.GaussianBlur(blur_width) )
+    
+            # Apply mask to background and render
+            bg.putalpha(alpha_mask)
             mask = aggdraw_to_numpy_surface(bg)
-            mask.mask(alpha_mask)
-
-        if mask_type == CENTRAL:
-            # Create solid background
-            bg_size = diameter + pad
-            bg = Image.new(RGBA, (bg_size, bg_size), MASK_COLOR)
-            tl = pad // 2
-            br = bg_size - tl
-
-            # Create an alpha mask
-            alpha_mask = Image.new(RGBA, (bg_size, bg_size), WHITE)
-            ImageDraw.Draw(alpha_mask, RGBA).ellipse((tl, tl, br, br), BLACK)
-            alpha_mask = aggdraw_to_numpy_surface(alpha_mask.filter(ImageFilter.GaussianBlur(self.mask_blur_width)))
-
-            # render mask
-            mask = aggdraw_to_numpy_surface(bg)
-            mask.mask(alpha_mask, grey_scale=True)
 
         return mask
 
@@ -389,9 +368,7 @@ class FigureGroundSearch(klibs.Experiment):
         position = self.el.gaze()
         fill()
         blit(self.figure, 5, P.screen_c)
-        if self.mask_type == PERIPHERAL and not self.el.within_boundary(self.mask_label, EL_GAZE_POS):
-            clear()
-        elif not position:
+        if not position:
             clear()
         else:
             if self.mask is not None:
