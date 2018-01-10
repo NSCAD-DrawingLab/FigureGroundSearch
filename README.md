@@ -2,7 +2,7 @@
 
 FigureGroundSearch is an experiment program for a study looking at the effects of different types of visual masking (central, peripheral, and none) at different size on the speed and accuracy with which global and local features are perceived.
 
-![figure_ground_animation](https://media.giphy.com/media/3ohjV90sBbdBnBSCVq/giphy.gif)
+![figure_ground_animation](https://drive.google.com/uc?id=1JIxEm-NS0pWj9aYuIZ01s4Ma-SP74H0p)
 
 ## Requirements
 
