@@ -102,14 +102,14 @@ class FigureGroundSearch(klibs.Experiment):
             if new_max_mask_px > P.screen_y:
                 smaller_than_screen = False
                 self.maximum_mask_size -= 1
-        for size in self.trial_factory.exp_factors[2][1]:
+        for size in self.trial_factory.exp_factors['mask_size']:
             if size > self.maximum_mask_size:
                 e_str = "The maximum mask size this monitor can support is {0} degrees.".format(self.maximum_mask_size)
                 raise ValueError(e_str)
         clear()
         message("Rendering masks...", "q_and_a", location=P.screen_c, registration=5, flip_screen=True)
         self.masks = {}
-        for size in self.trial_factory.exp_factors[2][1]:
+        for size in self.trial_factory.exp_factors['mask_size']:
             pump()
             self.masks["{0}_{1}".format(CENTRAL, size)] = self.mask(size, CENTRAL).render()
             self.masks["{0}_{1}".format(PERIPHERAL, size)] = self.mask(size, PERIPHERAL).render()
@@ -174,12 +174,6 @@ class FigureGroundSearch(klibs.Experiment):
         # choose randomly varying parts of trial
         self.orientation = random.choice(self.orientations)
         self.fixation = tuple(random.choice(self.exp_meta_factors['fixation']))
-        if self.fixation[1] < P.screen_c[1]:
-            self.fixation_bounds = "dc_top_box"
-        elif self.fixation[1] > P.screen_c[1]:
-            self.fixation_bounds = "dc_bottom_box"
-        else:
-            self.fixation_bounds = "dc_central_box"
 
         # infer which mask & stim to use and retrieve them
         self.figure = self.target_shape if self.target_level == LOCAL else False
@@ -197,7 +191,7 @@ class FigureGroundSearch(klibs.Experiment):
         blit(self.trial_start_msg, 5, P.screen_c)
         flip()
         any_key()
-        self.el.drift_correct(self.fixation, self.fixation_bounds)
+        self.el.drift_correct(self.fixation)
 
     def trial(self):
         """

@@ -1,4 +1,3 @@
-__author__ = 'Austin Hurst'
 from klibs.KLIndependentVariable import IndependentVariableSet, IndependentVariable
 
 
